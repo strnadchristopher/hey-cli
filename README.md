@@ -14,10 +14,10 @@ cd hey-cli
 cargo build --release
 ```
 
-Add that binary to your path however you would like to do so. I personally use `~/.local/bin` and add that to my path.
+Add the binary created in target/release/ to your path however you would like to do so. I personally use `~/.local/bin` and add that to my path.
 
 ## Adding Your OpenAI API Key
-In order for this bot to work, you must get a open ai api key. Add that key to your environment variables as `OPENAI_API_KEY`. You can do this by adding the following to your `.bashrc` or `.zshrc` or whatever shell you use.
+In order for this bot to work, you must supply an open ai api key. Add that key to your environment variables as `OPENAI_API_KEY`. You can do this by adding the following to your `.bashrc` or `.zshrc` or whatever shell you use.
 
 ```bash
 OPENAI_API_KEY=yourkeyhere
@@ -35,6 +35,5 @@ Options:
 
 Prompt:
 - The prompt to use for the chat-gpt model. You can type in natural language and you do NOT have to use quotation marks, although it seems right now question marks will not work if you chose to omit quotation marks.
-
 
 
