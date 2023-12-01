@@ -1,10 +1,10 @@
-# Hi-cli
+# Hey-cli
 
 Get Chat-GPT responses in your terminal.
 
-## Wow so cool another Chat-Gpt thing you're so original
+## Wow so cool another Chat-Gpt thing
 
-I know thank you. I personally find this useful because I'm always forgetting common or uncommon linux commands so I made this in a couple hours to help me out. I hope it helps you too. Written in rust.
+I personally find this useful because I'm always forgetting common or uncommon linux commands so I made this in a couple hours to help me out. I hope it helps you too. Written in rust.
 
 ## Installation
 
@@ -15,6 +15,8 @@ cargo build --release
 ```
 
 Add the binary created in target/release/ to your path however you would like to do so. I personally use `~/.local/bin` and add that to my path.
+
+- Note that after doing this, you'll be able to run the program with the command 'hey-cli', but if you'd like something shorter you can rename the binary to whatever you'd like, i.e. 'hey', 'hi'. I'll be changing the default binary name in the next couple days to something simpler like that.
 
 ## Adding Your OpenAI API Key
 In order for this bot to work, you must supply an open ai api key. Add that key to your environment variables as `OPENAI_API_KEY`. You can do this by adding the following to your `.bashrc` or `.zshrc` or whatever shell you use.
