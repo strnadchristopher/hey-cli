@@ -2,9 +2,9 @@
 
 Get Chat-GPT responses in your terminal.
 
-## Wow so cool another Chat-Gpt thing
+## Chat-GPT in your terminal
 
-I personally find this useful because I'm always forgetting common or uncommon linux commands so I made this in a couple hours to help me out. I hope it helps you too. Written in rust.
+Do you ever find yourself forgetting common linux commands? Do you ever wish you could just ask your terminal how to do something? Well now you can! With hey-cli, you can get responses from the chat-gpt model in your terminal. Just type in a prompt and get a response! If it comes back with any commands, you can run them quickly by typing "Y" when it asks you if you want to run the command. Or if it suggests multiple, you can type in the number of the command you want to run.
 
 ## Installation
 
@@ -27,7 +27,7 @@ OPENAI_API_KEY=yourkeyhere
 ## Usage
 
 ```bash
-hey-cli [options] [prompt]
+hey [options] [prompt]
 ```
 
 Options:
