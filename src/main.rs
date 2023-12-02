@@ -34,16 +34,8 @@ async fn main() {
         println!("Prompt: {}", prompt.clone());
     }
 
-    // Next, call the openai api
-    // let command_suggestion_response = match openai::get_response_object(prompt, openai_api_key, options).await{
-    //     Ok(res) => {res},
-    //     Err(e) => {
-    //         println!("Error when calling the OpenAi API: {}", e);
-    //         return;
-    //     },
-    // };
     
-    let command_suggestion_response = match openai::get_response_object(prompt, openai_api_key, options).await{
+    let command_suggestions = match openai::get_stream_response_object(prompt, openai_api_key).await{
         Ok(res) => {res},
         Err(e) => {
             println!("Error when calling the OpenAi API: {}", e);
@@ -51,34 +43,75 @@ async fn main() {
         },
     };
 
-    // Next, print the response
-    println!("{}", command_suggestion_response.message);
-
-    if command_suggestion_response.command_suggestion == "NULL" {
-        return;
-    }
-
-    println!("Would you like to run the command: {} [Y/n]", command_suggestion_response.command_suggestion);
     
-    // Wait for keyboard input, and then read it
-    let mut input = String::new();
-    match std::io::stdin().read_line(&mut input){
-        Ok(_) => {// If the user wants to run the command, run it
-            if input.trim() == "Y" || input.trim() == "y" {
-                // Run the command
-                let output = std::process::Command::new("sh")
-                    .arg("-c")
-                    .arg(command_suggestion_response.command_suggestion)
-                    .output()
-                    .expect("failed to execute process");
-                // Print the output
-                println!("{}", String::from_utf8_lossy(&output.stdout));
-            }},
-        Err(e) => {
-            println!("Error reading command line input: {}", e);
+
+    match command_suggestions.len() {
+        0 =>{
             return;
+        }
+        1 =>{
+            let command_string = command_suggestions[0].command.clone();
+            println!("Would you like to run the command: {} [Y/n]", command_suggestions[0].command);
+
+            let mut input = String::new();
+            
+            match std::io::stdin().read_line(&mut input){
+                Ok(_) => {// If the user wants to run the command, run it
+                    if input.trim() == "Y" || input.trim() == "y" {
+                        // Run the command
+                        let output = std::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(command_string)
+                            .output()
+                            .expect("failed to execute process");
+                        // Print the output
+                        println!("{}", String::from_utf8_lossy(&output.stdout));
+                    }},
+                Err(e) => {
+                    println!("Error reading command line input: {}", e);
+                    return;
+                },
+            }
         },
+        _ =>{
+            println!("Which command would you like to run? [1-{}]", command_suggestions.len());
+            
+            let mut input = String::new();
+            
+            match std::io::stdin().read_line(&mut input){
+                Ok(_) => {// If the user wants to run the command, run it
+                    let command_index = match input.trim().parse::<usize>(){
+                        Ok(res) => {res},
+                        Err(_) => {
+                            println!("Ok, no commands will be run.");
+                            return;
+                        },
+                    };
+                    if command_index > command_suggestions.len() || command_index == 0 {
+                        println!("Ok, no commands will be run.");
+                        return;
+                    }
+                    let command_string = command_suggestions[command_index - 1].command.clone();
+                    // Run the command
+                    let output = std::process::Command::new("sh")
+                        .arg("-c")
+                        .arg(command_string)
+                        .output()
+                        .expect("failed to execute process");
+                    // Print the output
+                    println!("{}", String::from_utf8_lossy(&output.stdout));
+
+                    },
+                Err(e) => {
+                    println!("Error reading command line input: {}", e);
+                    return;
+                },
+            }
+        }
     }
+
+    
+
 }
 
 

@@ -1,7 +1,6 @@
 // This is a simple rust program that calls the open ai chat gpt api
 use reqwest;
 use reqwest_eventsource::EventSource;
-use crate::cli;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct OpenAiMessageObject{
@@ -52,77 +51,6 @@ pub struct CommandSuggestionResponse{
     pub command_suggestion: String,
 }
 
-pub async fn get_response_object(prompt: String, openai_api_key: String, options: cli::CommandLineOptions) -> Result<CommandSuggestionResponse, serde_json::Error> {
-    let api_response = match get_openai_response_stream(prompt, openai_api_key, options).await {
-        Ok(res) => {res},
-        Err(e) => {
-            println!("Error: {}", e);
-            "{}".to_string()
-        },
-    };
-
-    let command_suggestion_response = match serde_json::from_str::<OpenAiChatCompletionResponse>(&api_response) {
-        Ok(js) => {
-            match serde_json::from_str::<CommandSuggestionResponse>(js.choices[0].message.content.as_str()){
-                Ok(js) => {Ok(js)},
-                Err(e) => {
-                    println!("Error when parsing command suggestion response: {}", e);
-                    Err(e)
-                },
-            }
-        },
-        Err(e) => {
-            println!("Error when getting response from api. Make sure you've added your secret key to your environment ('OPENAI_API_KEY=sk_....'): {}", e);
-            Err(e)
-        },
-    };
-
-    command_suggestion_response
-
-    
-}
-
-pub async fn get_openai_response(prompt: String, openai_api_key: String, options: cli::CommandLineOptions) -> Result<String, reqwest::Error>{
-    let mut headers = reqwest::header::HeaderMap::new();
-    headers.append("Content-Type", reqwest::header::HeaderValue::from_static("application/json"));
-    headers.append("Authorization", reqwest::header::HeaderValue::from_str(&format!("Bearer {}", openai_api_key)).unwrap());
-
-    let body = OpenAiChatCompletionRequest {
-        model: "gpt-4-1106-preview".to_string(),
-        messages: vec![
-            OpenAiMessageObject {
-                role: "system".to_string(),
-                content: "You are the personification of a user's command line interface. You are helpful, friendly, and extremely knowledgable. You exist in the context of an Arch Linux terminal emulator. If the user is asking how to do something in the terminal, you will respond with a linux command line command to help them complete their task. Always return responses with a JSON object, with the fields 'message' and 'command_suggestion'. With your text response being the message, and the command_suggestion being the command string you are suggesting they run. If there is no command to suggest, return 'command_suggestion' as 'NULL'.".to_string(),
-            },
-            OpenAiMessageObject {
-                role: "user".to_string(),
-                content: prompt,
-            },
-        ],
-        // Response format is a json object with the field 'type' and the value 'json_object'
-        response_format: ResponseFormat{
-            r#type: "json_object".to_string(),
-        },
-        stream: false
-    };
-
-    let res = reqwest::Client::new()
-        .post("https://api.openai.com/v1/chat/completions")
-        .headers(headers)
-        .json(&body)
-        .send()
-        .await?;
-
-    // Print the response
-    if options.debug {
-        println!("API Response: {:?}", res);
-    }
-
-    let response_text = res.text().await?;
-
-    Ok(response_text)
-}
-
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct OpenAiResponseByteStream{
     pub id: String,
@@ -146,15 +74,13 @@ pub struct OpenAiResponseByteStreamChoiceDelta{
 }
 use futures_util::StreamExt;
 use reqwest_eventsource::Event;
-use std::io::{stdout, Write};
+use std::io::stdout;
 
 use crossterm::{
     cursor,
     execute,
-    terminal::{Clear, ClearType},
-    style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
-    ExecutableCommand,
-    event,
+    terminal::Clear,
+    style::Print,
 };
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -163,8 +89,15 @@ pub struct StreamCommandSuggestionResponse{
     pub command_suggestion: String,
 }
 
-pub async fn get_stream_response_object(prompt: String, openai_api_key: String, options: cli::CommandLineOptions) -> Result<CommandSuggestionResponse, serde_json::Error> {
-    let api_response = match get_openai_response_stream(prompt, openai_api_key, options).await {
+#[derive(serde::Deserialize, serde::Serialize, Debug)]
+pub struct CommandSuggestion{
+    pub command: String,
+}
+
+use regex;
+
+pub async fn get_stream_response_object(prompt: String, openai_api_key: String) -> Result<Vec<CommandSuggestion>, serde_json::Error> {
+    let api_response = match generate_response(prompt, openai_api_key).await {
         Ok(res) => {res},
         Err(e) => {
             println!("Error: {}", e);
@@ -172,32 +105,61 @@ pub async fn get_stream_response_object(prompt: String, openai_api_key: String, 
         },
     };
 
-    let command_suggestion_response = match serde_json::from_str::<OpenAiChatCompletionResponse>(&api_response) {
-        Ok(js) => {
-            match serde_json::from_str::<StreamCommandSuggestionResponse>(format!{
-                "{}
-                ", 
-            }){
-                Ok(js) => {Ok(js)},
-                Err(e) => {
-                    println!("Error when parsing command suggestion response: {}", e);
-                    Err(e)
-                },
-            }
-        },
-        Err(e) => {
-            println!("Error when getting response from api. Make sure you've added your secret key to your environment ('OPENAI_API_KEY=sk_....'): {}", e);
-            Err(e)
-        },
-    };
+    // Parse the command suggestions from response
 
-    command_suggestion_response
+    // First, create an empty vector of CommandSuggestion structs
+    let mut command_suggestions = Vec::<CommandSuggestion>::new();
 
+    // The api_response may have instances of ```1, ```2, etc, which are used to number code snipits, each code snippit ends with trailing ```
+    // We need to extract the code snippits from the api_response, and then remove the ```1, ```2, etc, and then add the code snippits to the command_suggestions vector
     
+    // First, use regex to find every instance of ```(any series of chracters)``` and then add each instance to a vector
+    let mut code_snippits = Vec::<String>::new();
+    let re = regex::Regex::new(r"```(.|\n)*?```").unwrap();
+    for cap in re.captures_iter(&api_response) {
+        // We're going to add each code snippit to the vector
+        // But first we must remove the ``` characters as well as any numbers and any newlines characters
+        code_snippits.push(
+            cap[0].to_string()
+            .replace("```", "")
+            .replace("\n", "")
+            .replace("1", "")
+            .replace("2", "")
+            .replace("3", "")
+            .replace("4", "")
+            .replace("5", "")
+            .replace("6", "")
+            .replace("7", "")
+            .replace("8", "")
+            .replace("9", "")
+            .replace("0", "")
+        );
+        command_suggestions.push(CommandSuggestion { command: (
+            cap[0].to_string()
+            .replace("```", "")
+            .replace("\n", "")
+            .replace("1", "")
+            .replace("2", "")
+            .replace("3", "")
+            .replace("4", "")
+            .replace("5", "")
+            .replace("6", "")
+            .replace("7", "")
+            .replace("8", "")
+            .replace("9", "")
+            .replace("0", "")
+        ) }
+        );
+    }
+    if code_snippits.len() > 0{
+        println!("Code snippits: {:?}", code_snippits);
+    }
+
+    Ok(command_suggestions)
 }
 
 // This is a function for handling a stream of messages from the open ai api, which uses EventSource to get server side events
-pub async fn get_openai_response_stream(prompt: String, openai_api_key: String, options: cli::CommandLineOptions) -> Result<String, reqwest::Error>{
+pub async fn generate_response(prompt: String, openai_api_key: String) -> Result<String, reqwest::Error>{
     let mut headers = reqwest::header::HeaderMap::new();
     headers.append("Content-Type", reqwest::header::HeaderValue::from_static("application/json"));
     headers.append("Authorization", reqwest::header::HeaderValue::from_str(&format!("Bearer {}", openai_api_key)).unwrap());
@@ -224,13 +186,13 @@ pub async fn get_openai_response_stream(prompt: String, openai_api_key: String, 
         },
         stream: true
     };
-    let mut res = reqwest::Client::new()
+    let res = reqwest::Client::new()
         .post("https://api.openai.com/v1/chat/completions")
         .headers(headers)
         .json(&body);
 
-    let mut display_string = "".to_string();
-    let mut es = EventSource::new(res);
+    let mut response_string = "".to_string();
+    let es = EventSource::new(res);
     match es {
         Ok(mut es) => {
             while let Some(event) = es.next().await{
@@ -250,12 +212,12 @@ pub async fn get_openai_response_stream(prompt: String, openai_api_key: String, 
                                     Some(content) => {
                                         
                                         // let content = content.replace("\n", "").to_string();
-                                        display_string.push_str(&content);
+                                        response_string.push_str(&content);
                                         execute!(
                                             stdout(),
                                             cursor::MoveToColumn(0),
                                             Clear(crossterm::terminal::ClearType::All),
-                                            Print(display_string.clone()),
+                                            Print(response_string.clone()),
                                         ).unwrap();
                                     },
                                     None => {},
@@ -280,5 +242,5 @@ pub async fn get_openai_response_stream(prompt: String, openai_api_key: String, 
     }
     println!();
 
-    Ok("hey".to_string())
+    Ok(response_string)
 }
