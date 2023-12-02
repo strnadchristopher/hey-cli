@@ -35,6 +35,14 @@ async fn main() {
     }
 
     // Next, call the openai api
+    // let command_suggestion_response = match openai::get_response_object(prompt, openai_api_key, options).await{
+    //     Ok(res) => {res},
+    //     Err(e) => {
+    //         println!("Error when calling the OpenAi API: {}", e);
+    //         return;
+    //     },
+    // };
+    
     let command_suggestion_response = match openai::get_response_object(prompt, openai_api_key, options).await{
         Ok(res) => {res},
         Err(e) => {
@@ -42,7 +50,7 @@ async fn main() {
             return;
         },
     };
-    
+
     // Next, print the response
     println!("{}", command_suggestion_response.message);
 
