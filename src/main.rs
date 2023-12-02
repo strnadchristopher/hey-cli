@@ -22,17 +22,11 @@ async fn main() {
         println!("Usage: hey [options] [prompt]");
         println!("Options:");
         println!("  -h, --help     Prints help information");
-        println!("  -d, --debug    Prints debug information");
         return;
     }
 
     // Next, get all the arguments and compile them into one string
     let prompt = options.chat_input.trim().to_string();
-
-    // Next, print the prompt
-    if options.debug{
-        println!("Prompt: {}", prompt.clone());
-    }
 
     
     let command_suggestions = match openai::get_stream_response_object(prompt, openai_api_key).await{
